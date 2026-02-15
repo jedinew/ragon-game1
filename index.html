@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>가위바위보 확장판</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #f4f7fb;
+        --card: #ffffff;
+        --text: #1f2937;
+        --accent: #5b21b6;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .container {
+        max-width: 740px;
+        margin: 2rem auto;
+        padding: 1.5rem;
+      }
+
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+
+      .subtitle {
+        margin-top: 0;
+        color: #6b7280;
+      }
+
+      .mode-card,
+      .result-card,
+      .scoreboard {
+        background: var(--card);
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1rem;
+      }
+
+      .buttons {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+        font-size: 1rem;
+        cursor: pointer;
+        background: #e5e7eb;
+      }
+
+      button:hover {
+        filter: brightness(0.95);
+      }
+
+      .buttons button {
+        background: #ddd6fe;
+      }
+
+      .reset {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .scoreboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .scoreboard div {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 0.6rem;
+        text-align: center;
+      }
+
+      .scoreboard span {
+        display: block;
+        font-size: 0.8rem;
+        color: #6b7280;
+      }
+
+      .scoreboard strong {
+        font-size: 1.3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h1>가위바위보 확장판</h1>
+      <p class="subtitle">연승 보너스 + 컴퓨터 패턴(랜덤/학습형)</p>
+
+      <section class="mode-card">
+        <label for="mode">컴퓨터 모드</label>
+        <select id="mode">
+          <option value="random">랜덤</option>
+          <option value="adaptive">학습형(플레이어 패턴 대응)</option>
+        </select>
+      </section>
+
+      <section class="buttons" aria-label="선택 버튼">
+        <button data-choice="rock">✊ 바위</button>
+        <button data-choice="paper">✋ 보</button>
+        <button data-choice="scissors">✌️ 가위</button>
+      </section>
+
+      <section class="result-card">
+        <p id="roundResult">버튼을 눌러 시작하세요!</p>
+        <p id="matchup">당신: - / 컴퓨터: -</p>
+      </section>
+
+      <section class="scoreboard">
+        <div><span>승</span><strong id="wins">0</strong></div>
+        <div><span>패</span><strong id="losses">0</strong></div>
+        <div><span>무</span><strong id="draws">0</strong></div>
+        <div><span>현재 연승</span><strong id="streak">0</strong></div>
+        <div><span>최고 연승</span><strong id="bestStreak">0</strong></div>
+        <div><span>보너스 점수</span><strong id="bonus">0</strong></div>
+        <div><span>총점</span><strong id="total">0</strong></div>
+      </section>
+
+      <button id="resetBtn" class="reset">초기화</button>
+    </main>
+
+    <script>
+      const CHOICES = ["rock", "paper", "scissors"];
+
+      const labels = {
+        rock: "바위",
+        paper: "보",
+        scissors: "가위",
+      };
+
+      const counterToPlayer = {
+        rock: "paper",
+        paper: "scissors",
+        scissors: "rock",
+      };
+
+      const state = {
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        streak: 0,
+        bestStreak: 0,
+        bonus: 0,
+        playerHistory: [],
+      };
+
+      const roundResultEl = document.getElementById("roundResult");
+      const matchupEl = document.getElementById("matchup");
+      const modeEl = document.getElementById("mode");
+
+      const metrics = {
+        wins: document.getElementById("wins"),
+        losses: document.getElementById("losses"),
+        draws: document.getElementById("draws"),
+        streak: document.getElementById("streak"),
+        bestStreak: document.getElementById("bestStreak"),
+        bonus: document.getElementById("bonus"),
+        total: document.getElementById("total"),
+      };
+
+      function randomChoice() {
+        return CHOICES[Math.floor(Math.random() * CHOICES.length)];
+      }
+
+      function adaptiveChoice() {
+        if (state.playerHistory.length < 3) {
+          return randomChoice();
+        }
+
+        const counts = { rock: 0, paper: 0, scissors: 0 };
+        state.playerHistory.forEach((choice) => {
+          counts[choice] += 1;
+        });
+
+        const predictedPlayer = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+        return counterToPlayer[predictedPlayer];
+      }
+
+      function judge(player, computer) {
+        if (player === computer) {
+          return "draw";
+        }
+        if (
+          (player === "rock" && computer === "scissors") ||
+          (player === "paper" && computer === "rock") ||
+          (player === "scissors" && computer === "paper")
+        ) {
+          return "win";
+        }
+        return "lose";
+      }
+
+      function calcTotal() {
+        return state.wins * 10 - state.losses * 5 + state.bonus;
+      }
+
+      function applyRound(playerChoice) {
+        const computerChoice = modeEl.value === "adaptive" ? adaptiveChoice() : randomChoice();
+        const result = judge(playerChoice, computerChoice);
+
+        state.playerHistory.push(playerChoice);
+
+        if (result === "win") {
+          state.wins += 1;
+          state.streak += 1;
+          state.bestStreak = Math.max(state.bestStreak, state.streak);
+
+          if (state.streak > 0 && state.streak % 3 === 0) {
+            state.bonus += 15;
+            roundResultEl.textContent = `승리! ${state.streak}연승 달성, 보너스 +15점`;
+          } else {
+            roundResultEl.textContent = "승리!";
+          }
+        } else if (result === "lose") {
+          state.losses += 1;
+          state.streak = 0;
+          roundResultEl.textContent = "패배!";
+        } else {
+          state.draws += 1;
+          roundResultEl.textContent = "무승부!";
+        }
+
+        matchupEl.textContent = `당신: ${labels[playerChoice]} / 컴퓨터: ${labels[computerChoice]}`;
+        render();
+      }
+
+      function render() {
+        metrics.wins.textContent = state.wins;
+        metrics.losses.textContent = state.losses;
+        metrics.draws.textContent = state.draws;
+        metrics.streak.textContent = state.streak;
+        metrics.bestStreak.textContent = state.bestStreak;
+        metrics.bonus.textContent = state.bonus;
+        metrics.total.textContent = calcTotal();
+      }
+
+      function reset() {
+        state.wins = 0;
+        state.losses = 0;
+        state.draws = 0;
+        state.streak = 0;
+        state.bestStreak = 0;
+        state.bonus = 0;
+        state.playerHistory = [];
+        roundResultEl.textContent = "버튼을 눌러 시작하세요!";
+        matchupEl.textContent = "당신: - / 컴퓨터: -";
+        render();
+      }
+
+      document.querySelectorAll("[data-choice]").forEach((button) => {
+        button.addEventListener("click", () => {
+          applyRound(button.dataset.choice);
+        });
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", reset);
+
+      render();
+    </script>
+  </body>
+</html>
